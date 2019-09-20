@@ -52,3 +52,4 @@ SELECT CountryName, CountryCode, "Currency" =
 FROM Countries
 ORDER BY CountryName
 -----
+SELECT Name FROM Characters ORDER BY Name
