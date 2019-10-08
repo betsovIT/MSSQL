@@ -100,6 +100,34 @@ WHERE DepartmentID = @departmentId
 CREATE PROC usp_GetHoldersFullName AS
 SELECT FirstName + ' ' + LastName AS [Full Name] FROM AccountHolders
 --10-People with Balance Higher Than
-CREATE PROC usp_GetHoldersWithBalanceHigherThan(@tresholdNumber DECIMAL(18,4) AS
+CREATE PROC usp_GetHoldersWithBalanceHigherThan(@tresholdNumber DECIMAL(18,4)) AS
 SELECT FirstName, LastName
-FROM AccountHolders
+FROM Accounts a
+INNER JOIN AccountHolders ac ON a.AccountHolderId = ac.ID
+GROUP BY FirstName, LastName
+HAVING SUM(a.Balance) >= @tresholdNumber
+ORDER BY FirstName, LastName
+
+EXEC usp_GetHoldersWithBalanceHigherThan 55000
+--11-Future Value Function
+CREATE FUNCTION ufn_CalculateFutureValue(@sum DECIMAL(15,4), @yearlyInterestRate FLOAT, @years INT) 
+RETURNS DECIMAL(15,4)
+BEGIN
+	DECLARE @result DECIMAL(15,4)
+	
+	SET @result = @sum * POWER((@yearlyInterestRate + 1),@years)
+
+	RETURN @result
+END
+--12-Calculating Interest
+CREATE PROC usp_CalculateFutureValueForAccount(@accountId INT, @interestRate FLOAT)
+AS
+BEGIN
+	SELECT a.Id, ac.FirstName, ac.LastName, a.Balance, dbo.ufn_CalculateFutureValue(a.Balance, @interestRate, 5) AS 'Balance in 5 years'
+
+	FROM Accounts a
+	INNER JOIN AccountHolders ac ON a.AccountHolderId = ac.ID
+	WHERE a.Id = @accountId
+END
+
+EXEC usp_CalculateFutureValueForAccount 1, 0.1
