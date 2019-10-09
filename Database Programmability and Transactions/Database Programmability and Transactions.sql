@@ -131,3 +131,14 @@ BEGIN
 END
 
 EXEC usp_CalculateFutureValueForAccount 1, 0.1
+--13-*Scalar Function: Cash in User Games Odd Rows
+CREATE FUNCTION ufn_CashInUsersGames(@gameName NVARCHAR(50))
+RETURNS TABLE
+AS
+RETURN
+	SELECT SUM(Cash) AS SumCash FROM
+	(SELECT [Cash],ROW_NUMBER() OVER (PARTITION BY [Name] ORDER BY [Cash] DESC) AS [Row]
+	FROM Games g
+	INNER JOIN UsersGames ug ON ug.GameId = g.Id
+	WHERE g.Name = @gameName) AS d
+	WHERE d.Row % 2 = 1
