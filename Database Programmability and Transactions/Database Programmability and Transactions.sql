@@ -142,3 +142,111 @@ RETURN
 	INNER JOIN UsersGames ug ON ug.GameId = g.Id
 	WHERE g.Name = @gameName) AS d
 	WHERE d.Row % 2 = 1
+--14-Create Table Logs
+ALTER TABLE Logs(LogId INT PRIMARY KEY IDENTITY, AccountId INT FOREIGN KEY REFERENCES Accounts(Id), OldSum DECIMAL(15,4) NOT NULL, NewSUM DECIMAL(15,4))
+GO
+CREATE TRIGGER tr_LogTransaction ON Accounts FOR UPDATE
+AS
+BEGIN
+	DECLARE @newSum DECIMAL(15,2) = (SELECT i.Balance FROM [INSERTED] AS i)
+	DECLARE @oldSUM DECIMAL(15,2) = (SELECT d.Balance FROM [DELETED] AS d)
+	DECLARE @accountID INT = (SELECT i.Id FROM [INSERTED] AS i)
+
+	INSERT INTO Logs(AccountId, OldSum, NewSUM) VALUES
+	(@accountID, @oldSUM, @newSum)
+END
+
+--15-Create Table Emails
+CREATE TABLE NotificationEmails
+(Id INT PRIMARY KEY IDENTITY, 
+Recipient INT FOREIGN KEY REFERENCES Accounts(Id), 
+[Subject] NVARCHAR(200), 
+[Body] NVARCHAR(200))
+
+CREATE TRIGGER tr_EmailOnLog ON [Logs] FOR INSERT
+AS
+BEGIN
+	DECLARE @recipient INT = (SELECT AccountId FROM [INSERTED])
+	DECLARE @newSum DECIMAL(15,2) = (SELECT NewSUM FROM [INSERTED] AS i)
+	DECLARE @oldSum DECIMAL(15,2) = (SELECT OldSUM FROM [DELETED] AS d)
+	DECLARE @datetime DATETIME = GETDATE()
+
+	INSERT INTO NotificationEmails([Recipient], [Subject], [Body]) VALUES
+	(@recipient,
+	'Balance change for account: ' + CONVERT(NVARCHAR(10),@recipient), 
+	'On ' + CONVERT(NVARCHAR(50),@datetime) +' your balance was changed from ' + CONVERT(NVARCHAR(10),@oldSum) + ' to ' + CONVERT(NVARCHAR(10),@newSum))
+END
+--16-Deposit Money
+CREATE PROC usp_DepositMoney(@accountId INT, @moneyAmount DECIMAL(15,4))
+AS
+BEGIN TRANSACTION
+	IF(@moneyAmount < 0)
+		BEGIN
+			ROLLBACK
+			RAISERROR('Invalid money amount!',1,16)
+			RETURN
+		END
+	UPDATE Accounts SET Balance = Balance + @moneyAmount
+	WHERE @accountId = Id
+COMMIT
+--17-Withdraw money procedure
+CREATE PROC usp_WithdrawMoney(@AccountID INT, @MoneyAmmount DECIMAL(15,4))
+AS
+BEGIN TRANSACTION
+	IF(@MoneyAmmount <= 0)
+	BEGIN
+		ROLLBACK
+		RAISERROR('Invalid money amount!',1,16)
+		RETURN
+	END
+
+	IF((SELECT Balance FROM Accounts WHERE Id = @AccountID) < @MoneyAmmount)
+	BEGIN
+		ROLLBACK
+		RAISERROR('Not enough money in account',1,16)
+		RETURN
+	END
+
+	UPDATE Accounts 
+	SET Balance = Balance - @MoneyAmmount
+	WHERE Id = @AccountID
+COMMIT
+--18-Money Transfer
+CREATE PROC usp_TransferMoney(@SenderId INT, @ReceiverId INT, @Amount DECIMAL(15,4))
+AS
+BEGIN TRANSACTION
+	EXEC usp_WithdrawMoney @SenderId, @Amount
+	EXEC usp_DepositMoney @ReceiverId, @Amount
+COMMIT
+--19-Trigger
+--20-Massive Shopping
+--21-Employees with Three Projects
+CREATE PROC usp_AssignProject(@emloyeeId INT, @projectID INT)
+AS
+BEGIN TRANSACTION
+	IF((SELECT COUNT(*) FROM EmployeesProjects WHERE EmployeeID = @emloyeeId) = 3)
+	BEGIN
+		ROLLBACK
+		RAISERROR('The employee has too many projects!',16,1)
+		RETURN
+	END
+
+	INSERT INTO EmployeesProjects VALUES
+	(@emloyeeId,@projectID)
+COMMIT
+--22-Delete Employees
+CREATE TABLE Deleted_Employees
+(EmployeeId INT PRIMARY KEY, 
+FirstName VARCHAR(20), 
+LastName VARCHAR(20), 
+MiddleName VARCHAR(20), 
+JobTitle VARCHAR(20), 
+DepartmentId INT FOREIGN KEY REFERENCES Departments(DepartmentID), 
+Salary DECIMAL(15,2))
+
+CREATE TRIGGER tr_storeDeletedEmployees ON Employees FOR DELETE
+AS
+BEGIN
+	INSERT INTO Deleted_Employees(FirstName,LastName,MiddleName,JobTitle,DepartmentId,Salary) 
+	SELECT FirstName,LastName, MiddleName, JobTitle, DepartmentID, Salary FROM [DELETED]
+END
