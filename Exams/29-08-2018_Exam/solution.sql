@@ -114,3 +114,35 @@ GROUP BY OrderId
 ORDER BY TotalPrice DESC
 
 --10-Rich Item, Poor Item
+SELECT TOP(10) o.Id AS OrderId, MAX(i.Price) AS ExpensivePrice, MIN(Price) AS CheapPrice
+FROM Orders o
+INNER JOIN OrderItems oi ON o.Id = oi.OrderId
+INNER JOIN Items i ON oi.ItemId = i.Id
+GROUP BY o.Id
+ORDER BY ExpensivePrice DESC, O.Id
+
+--11-Cashiers
+SELECT e.Id, FirstName, LastName
+FROM Employees e
+INNER JOIN Orders o ON e.Id = o.EmployeeId
+GROUP BY e.Id, FirstName, LastName
+ORDER BY e.Id
+
+--12-Lazy Employees 
+SELECT DISTINCT e.Id, FirstName + ' ' + LastName AS [Full Name]
+FROM Employees e
+INNER JOIN Shifts s ON e.Id = s.EmployeeId
+WHERE DATEDIFF(HOUR, CheckIn, CheckOut) < 4
+ORDER BY e.Id
+
+--13-Sellers
+SELECT FirstName + ' ' + LastName AS [Full Name], SUM(oi.Quantity * i.Price) AS [Total Price], SUM(oi.Quantity) AS Items
+FROM Employees e
+INNER JOIN Orders o ON e.Id = o.EmployeeId
+INNER JOIN OrderItems oi ON o.Id = oi.OrderId
+INNER JOIN Items i ON oi.ItemId = i.Id
+WHERE [DateTime] < '2018-06-15'
+GROUP BY FirstName + ' ' + LastName
+ORDER BY [Total Price] DESC, Items DESC
+
+--14-Tough days
